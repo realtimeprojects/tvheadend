@@ -14,35 +14,24 @@ channels = {}
 for transport in glob( expanduser( base + "/dvbtransports/*" )):
   for sfile in glob( "%s/*"%transport ):
     frontend = 0
-    m = match( "^_dev_dvb_adapter(\d+)_(\d+).*_(\d+)_([HV+])_satconf_(\d+)_[a-z\d]+$", basename( sfile ))
+    m = match( "^_dev_dvb_adapter(\d+)_.*(\d{8})_([HV+])_satconf_(\d+)_[a-z\d]+$", basename( sfile ))
     if m:
-      adapter, frontend, freq, pol, satconf = m.groups( )
-      adapter  = int(adapter)
-      frontend = int(frontend)
-      freq     = int(freq)
-      satconf  = int(satconf)
+      adapter, freq, pol, satconf = m.groups( )
+      adapter = int(adapter)
+      freq    = int(freq)
+      satconf = int(satconf)
     else:
-      m = match( "^_dev_dvb_adapter(\d+)_.*_(\d+)_([HV+])_satconf_(\d+)_[a-z\d]+$", basename( sfile ))
-      if m:
-        adapter, freq, pol, satconf = m.groups( )
-        adapter = int(adapter)
-        freq    = int(freq)
-        satconf = int(satconf)
-      else:
-        print "Error parsing '%s'"%sfile
-        exit( -1 )
+      print "Error parsing '%s'"%sfile
+      exit( -1 )
 
     if not config.has_key( adapter ):
       config[adapter] = {}
       config[adapter][frontend] = { "portcount": 0 }
-      adapterconf = expanduser( base + "/dvbadapters/_dev_dvb_adapter%d_%d_*_%d_%d_"%( adapter, frontend, adapter, frontend ))
+      adapterconf = expanduser( base + "/dvbadapters/_dev_dvb_adapter%d_*"%( adapter ))
       g = glob( adapterconf )
       if len( g ) != 1:
-        adapterconf = expanduser( base + "/dvbadapters/_dev_dvb_adapter%d_*_%d_"%( adapter, adapter ))
-        g = glob( adapterconf )
-        if len( g ) != 1:
-          print "Error finding satconf: '%s'"%adapterconf
-          exit( -1 )
+        print "Error finding adatper config: '%s'"%adapterconf
+        exit( -1 )
       fp = open( g[0] )
       adapterconf = json.load( fp )
       fp.close( )
@@ -68,7 +57,7 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       port = portcount
       config[adapter][frontend][port] = { "satconf": satconf, "muxcount": 0 }
       config[adapter][frontend]["portcount"] += 1
-      pfile = expanduser( base + "/dvbsatconf/_dev_dvb_adapter%d_%d_*_%d_%d_/%d"%( adapter, frontend, adapter, frontend, satconf ))
+      pfile = expanduser( base + "/dvbsatconf/_dev_dvb_adapter%d_*/%d"%( adapter, satconf ))
       g = glob( pfile )
       if len( g ) != 1:
         print "Error finding satconf: '%s'"%pfile
@@ -93,10 +82,10 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       mux = muxcount
       config[adapter][frontend][port][mux] = { "freq": freq, "pol": pol, "servicecount": 0 }
       config[adapter][frontend][port]["muxcount"] += 1
-      mfile = expanduser( base + "/dvbmuxes/_dev_dvb_adapter%d_%d_*_%d_%d_/_dev_dvb_adapter%d_%d_*_%d_%d_%d_%s_satconf_%d"%( adapter, frontend, adapter, frontend, adapter, frontend, adapter, frontend, freq, pol, satconf ))
+      mfile = expanduser( base + "/dvbmuxes/_dev_dvb_adapter%d_*/_dev_dvb_adapter%d_*%d_%s_satconf_%d"%( adapter, adapter, freq, pol, satconf ))
       g = glob( mfile )
       if len( g ) != 1:
-        print "Error finding satconf: '%s'"%mfile
+        print "Error finding mux: '%s'"%mfile
         exit( -1 )
       fp = open( g[0] )
       conf = json.load( fp )
@@ -113,6 +102,8 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       config[adapter][frontend][port][mux]["config"]["modulation"]        = conf["modulation"]
       config[adapter][frontend][port][mux]["config"]["delivery_system"]   = conf["delivery_system"]
       config[adapter][frontend][port][mux]["config"]["rolloff"]           = conf["rolloff"]
+
+    service = config[adapter][frontend][port][mux]["servicecount"]
 
     print sfile
     fp = open( sfile )
