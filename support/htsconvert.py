@@ -14,15 +14,25 @@ channels = {}
 for transport in glob( expanduser( base + "/dvbtransports/*" )):
   for sfile in glob( "%s/*"%transport ):
     frontend = 0
-    m = match( "^_dev_dvb_adapter(\d+)_.*(\d{8})_([HV+])_satconf_(\d+)_[a-z\d]+$", basename( sfile ))
+    flen = 8
+    m = match( "^_dev_dvb_adapter(\d+)_.*(\d{%d})_([HV+])_satconf_(\d+)_[a-z\d]+$"%flen, basename( sfile ))
     if m:
       adapter, freq, pol, satconf = m.groups( )
       adapter = int(adapter)
       freq    = int(freq)
       satconf = int(satconf)
     else:
-      print "Error parsing '%s'"%sfile
-      exit( -1 )
+      flen = 9
+      m = match( "^_dev_dvb_adapter(\d+)_.*(\d{%d})_[a-z\d]+$"%flen, basename( sfile ))
+      if m:
+        adapter, freq = m.groups( )
+        adapter = int(adapter)
+        freq    = int(freq)
+        pol = None
+        satconf = None
+      else:
+        print "Error parsing transport '%s'"%sfile
+        exit( -1 )
 
     if not config.has_key( adapter ):
       config[adapter] = {}
@@ -30,46 +40,53 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       adapterconf = expanduser( base + "/dvbadapters/_dev_dvb_adapter%d_*"%( adapter ))
       g = glob( adapterconf )
       if len( g ) != 1:
-        print "Error finding adatper config: '%s'"%adapterconf
-        exit( -1 )
-      fp = open( g[0] )
-      adapterconf = json.load( fp )
-      fp.close( )
-      config[adapter]["config"]  = { }
-      config[adapter]["config"]["displayname"] = adapterconf["displayname"]
-      config[adapter][frontend]["config"] = { }
-      config[adapter][frontend]["config"]["autodiscovery"]  = adapterconf["autodiscovery"]
-      config[adapter][frontend]["config"]["nitoid"]         = adapterconf["nitoid"]
-      config[adapter][frontend]["config"]["diseqc_version"] = adapterconf["diseqc_version"]
-      config[adapter][frontend]["config"]["qmon"]           = adapterconf["qmon"]
-      config[adapter][frontend]["config"]["idlescan"]       = adapterconf["idlescan"]
-      config[adapter][frontend]["config"]["type"]           = adapterconf["type"]
-      config[adapter][frontend]["config"]["dump_muxes"]     = adapterconf["dump_muxes"]
+        print "Warning: finding adatper config: '%s'"%adapterconf
+        config[adapter]["config"]  = { }
+        config[adapter][frontend]["config"] = { }
+      else:
+        fp = open( g[0] )
+        adapterconf = json.load( fp )
+        fp.close( )
+        config[adapter]["config"]  = { }
+        config[adapter]["config"]["displayname"] = adapterconf["displayname"]
+        config[adapter][frontend]["config"] = { }
+        config[adapter][frontend]["config"]["autodiscovery"]  = adapterconf["autodiscovery"]
+        config[adapter][frontend]["config"]["nitoid"]         = adapterconf["nitoid"]
+        config[adapter][frontend]["config"]["diseqc_version"] = adapterconf["diseqc_version"]
+        config[adapter][frontend]["config"]["qmon"]           = adapterconf["qmon"]
+        config[adapter][frontend]["config"]["idlescan"]       = adapterconf["idlescan"]
+        config[adapter][frontend]["config"]["type"]           = adapterconf["type"]
+        config[adapter][frontend]["config"]["dump_muxes"]     = adapterconf["dump_muxes"]
 
-    foundport = False
-    port = None
-    portcount = config[adapter][frontend]["portcount"]
-    for port in range( portcount + 1 ):
-      if config[adapter][frontend].has_key( port ) and config[adapter][frontend][port]["satconf"] == satconf:
-        foundport = True
-        break
-    if not foundport:
-      port = portcount
-      config[adapter][frontend][port] = { "satconf": satconf, "muxcount": 0 }
-      config[adapter][frontend]["portcount"] += 1
-      pfile = expanduser( base + "/dvbsatconf/_dev_dvb_adapter%d_*/%d"%( adapter, satconf ))
-      g = glob( pfile )
-      if len( g ) != 1:
-        print "Error finding satconf: '%s'"%pfile
-        exit( -1 )
-      fp = open( g[0] )
-      conf = json.load( fp )
-      fp.close( )
+    if satconf is not None:
+      foundport = False
+      port = 0
+      portcount = config[adapter][frontend]["portcount"]
+      for port in range( portcount + 1 ):
+        if config[adapter][frontend].has_key( port ) and config[adapter][frontend][port]["satconf"] == satconf:
+          foundport = True
+          break
+      if not foundport:
+        port = portcount
+        config[adapter][frontend][port] = { "satconf": satconf, "muxcount": 0 }
+        config[adapter][frontend]["portcount"] += 1
+        pfile = expanduser( base + "/dvbsatconf/_dev_dvb_adapter%d_*/%d"%( adapter, satconf ))
+        g = glob( pfile )
+        if len( g ) != 1:
+          print "Error finding satconf: '%s'"%pfile
+          exit( -1 )
+        fp = open( g[0] )
+        conf = json.load( fp )
+        fp.close( )
+        config[adapter][frontend][port]["config"] = {}
+        config[adapter][frontend][port]["config"]["name"]    = conf["name"]
+        config[adapter][frontend][port]["config"]["port"]    = conf["port"]
+        config[adapter][frontend][port]["config"]["comment"] = conf["comment"]
+        config[adapter][frontend][port]["config"]["lnb"]     = conf["lnb"]
+    else: # no satconf
+      port = 0
+      config[adapter][frontend][port] = { "muxcount": 0 }
       config[adapter][frontend][port]["config"] = {}
-      config[adapter][frontend][port]["config"]["name"]    = conf["name"]
-      config[adapter][frontend][port]["config"]["port"]    = conf["port"]
-      config[adapter][frontend][port]["config"]["comment"] = conf["comment"]
-      config[adapter][frontend][port]["config"]["lnb"]     = conf["lnb"]
 
     foundmux = False
     mux = None
@@ -82,7 +99,10 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       mux = muxcount
       config[adapter][frontend][port][mux] = { "freq": freq, "pol": pol, "servicecount": 0 }
       config[adapter][frontend][port]["muxcount"] += 1
-      mfile = expanduser( base + "/dvbmuxes/_dev_dvb_adapter%d_*/_dev_dvb_adapter%d_*%d_%s_satconf_%d"%( adapter, adapter, freq, pol, satconf ))
+      if satconf is not None:
+        mfile = expanduser( base + "/dvbmuxes/_dev_dvb_adapter%d_*/_dev_dvb_adapter%d_*%d_%s_satconf_%d"%( adapter, adapter, freq, pol, satconf ))
+      else:
+        mfile = expanduser( base + "/dvbmuxes/_dev_dvb_adapter%d_*/_dev_dvb_adapter%d_*%d"%( adapter, adapter, freq ))
       g = glob( mfile )
       if len( g ) != 1:
         print "Error finding mux: '%s'"%mfile
@@ -96,12 +116,18 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       config[adapter][frontend][port][mux]["config"]["status"]            = conf["status"]
       config[adapter][frontend][port][mux]["config"]["transportstreamid"] = conf["transportstreamid"]
       config[adapter][frontend][port][mux]["config"]["frequency"]         = conf["frequency"]
-      config[adapter][frontend][port][mux]["config"]["symbol_rate"]       = conf["symbol_rate"]
-      config[adapter][frontend][port][mux]["config"]["fec"]               = conf["fec"]
-      config[adapter][frontend][port][mux]["config"]["polarisation"]      = conf["polarisation"]
-      config[adapter][frontend][port][mux]["config"]["modulation"]        = conf["modulation"]
-      config[adapter][frontend][port][mux]["config"]["delivery_system"]   = conf["delivery_system"]
-      config[adapter][frontend][port][mux]["config"]["rolloff"]           = conf["rolloff"]
+      if conf.has_key( "symbol_rate" ):
+        config[adapter][frontend][port][mux]["config"]["symbol_rate"]       = conf["symbol_rate"]
+      if conf.has_key( "fec" ):
+        config[adapter][frontend][port][mux]["config"]["fec"]               = conf["fec"]
+      if conf.has_key( "polarisation" ):
+        config[adapter][frontend][port][mux]["config"]["polarisation"]      = conf["polarisation"]
+      if conf.has_key( "modulation" ):
+        config[adapter][frontend][port][mux]["config"]["modulation"]        = conf["modulation"]
+      if conf.has_key( "delivery_system" ):
+        config[adapter][frontend][port][mux]["config"]["delivery_system"]   = conf["delivery_system"]
+      if conf.has_key( "rolloff" ):
+        config[adapter][frontend][port][mux]["config"]["rolloff"]           = conf["rolloff"]
 
     service = config[adapter][frontend][port][mux]["servicecount"]
 
