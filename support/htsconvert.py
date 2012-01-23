@@ -11,6 +11,7 @@ base = "~/.hts/tvheadend"
 config = {}
 channels = {}
 
+adaptercount = 0
 for transport in glob( expanduser( base + "/dvbtransports/*" )):
   for sfile in glob( "%s/*"%transport ):
     frontend = 0
@@ -85,8 +86,9 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
         config[adapter][frontend][port]["config"]["lnb"]     = conf["lnb"]
     else: # no satconf
       port = 0
-      config[adapter][frontend][port] = { "muxcount": 0 }
-      config[adapter][frontend][port]["config"] = {}
+      if not config[adapter][frontend].has_key( port ):
+        config[adapter][frontend][port] = { "muxcount": 0 }
+        config[adapter][frontend][port]["config"] = {}
 
     foundmux = False
     mux = None
@@ -131,7 +133,7 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
 
     service = config[adapter][frontend][port][mux]["servicecount"]
 
-    print sfile
+    print basename( sfile )
     fp = open( sfile )
     conf = json.load( fp )
     fp.close( )
@@ -211,3 +213,4 @@ for c in channels:
   fp.write( json.dumps( channels[c], sort_keys=True, indent=4 ))
   fp.close( )
 
+#print "Converted %d adapters, %d muxes, %d services, %d channels"%( len( config ),
