@@ -21,8 +21,16 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       freq    = int(freq)
       satconf = int(satconf)
     else:
-      print "Error parsing '%s'"%sfile
-      exit( -1 )
+      m = match( "^_dev_dvb_adapter(\d+)_.*(\d{8})_[a-z\d]+$", basename( sfile ))
+      if m:
+        adapter, freq = m.groups( )
+        adapter = int(adapter)
+        freq    = int(freq)
+        pol = None
+        satconf = None
+      else:
+        print "Error parsing transport '%s'"%sfile
+        exit( -1 )
 
     if not config.has_key( adapter ):
       config[adapter] = {}
@@ -46,30 +54,35 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       config[adapter][frontend]["config"]["type"]           = adapterconf["type"]
       config[adapter][frontend]["config"]["dump_muxes"]     = adapterconf["dump_muxes"]
 
-    foundport = False
-    port = None
-    portcount = config[adapter][frontend]["portcount"]
-    for port in range( portcount + 1 ):
-      if config[adapter][frontend].has_key( port ) and config[adapter][frontend][port]["satconf"] == satconf:
-        foundport = True
-        break
-    if not foundport:
-      port = portcount
-      config[adapter][frontend][port] = { "satconf": satconf, "muxcount": 0 }
-      config[adapter][frontend]["portcount"] += 1
-      pfile = expanduser( base + "/dvbsatconf/_dev_dvb_adapter%d_*/%d"%( adapter, satconf ))
-      g = glob( pfile )
-      if len( g ) != 1:
-        print "Error finding satconf: '%s'"%pfile
-        exit( -1 )
-      fp = open( g[0] )
-      conf = json.load( fp )
-      fp.close( )
+    if satconf is not None:
+      foundport = False
+      port = 0
+      portcount = config[adapter][frontend]["portcount"]
+      for port in range( portcount + 1 ):
+        if config[adapter][frontend].has_key( port ) and config[adapter][frontend][port]["satconf"] == satconf:
+          foundport = True
+          break
+      if not foundport:
+        port = portcount
+        config[adapter][frontend][port] = { "satconf": satconf, "muxcount": 0 }
+        config[adapter][frontend]["portcount"] += 1
+        pfile = expanduser( base + "/dvbsatconf/_dev_dvb_adapter%d_*/%d"%( adapter, satconf ))
+        g = glob( pfile )
+        if len( g ) != 1:
+          print "Error finding satconf: '%s'"%pfile
+          exit( -1 )
+        fp = open( g[0] )
+        conf = json.load( fp )
+        fp.close( )
+        config[adapter][frontend][port]["config"] = {}
+        config[adapter][frontend][port]["config"]["name"]    = conf["name"]
+        config[adapter][frontend][port]["config"]["port"]    = conf["port"]
+        config[adapter][frontend][port]["config"]["comment"] = conf["comment"]
+        config[adapter][frontend][port]["config"]["lnb"]     = conf["lnb"]
+    else: # no satconf
+      port = 0
+      config[adapter][frontend][port] = { "muxcount": 0 }
       config[adapter][frontend][port]["config"] = {}
-      config[adapter][frontend][port]["config"]["name"]    = conf["name"]
-      config[adapter][frontend][port]["config"]["port"]    = conf["port"]
-      config[adapter][frontend][port]["config"]["comment"] = conf["comment"]
-      config[adapter][frontend][port]["config"]["lnb"]     = conf["lnb"]
 
     foundmux = False
     mux = None
@@ -82,7 +95,10 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       mux = muxcount
       config[adapter][frontend][port][mux] = { "freq": freq, "pol": pol, "servicecount": 0 }
       config[adapter][frontend][port]["muxcount"] += 1
-      mfile = expanduser( base + "/dvbmuxes/_dev_dvb_adapter%d_*/_dev_dvb_adapter%d_*%d_%s_satconf_%d"%( adapter, adapter, freq, pol, satconf ))
+      if satconf is not None:
+        mfile = expanduser( base + "/dvbmuxes/_dev_dvb_adapter%d_*/_dev_dvb_adapter%d_*%d_%s_satconf_%d"%( adapter, adapter, freq, pol, satconf ))
+      else:
+        mfile = expanduser( base + "/dvbmuxes/_dev_dvb_adapter%d_*/_dev_dvb_adapter%d_*%d"%( adapter, adapter, freq ))
       g = glob( mfile )
       if len( g ) != 1:
         print "Error finding mux: '%s'"%mfile
