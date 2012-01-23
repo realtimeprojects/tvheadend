@@ -14,14 +14,16 @@ channels = {}
 for transport in glob( expanduser( base + "/dvbtransports/*" )):
   for sfile in glob( "%s/*"%transport ):
     frontend = 0
-    m = match( "^_dev_dvb_adapter(\d+)_.*(\d{8})_([HV+])_satconf_(\d+)_[a-z\d]+$", basename( sfile ))
+    flen = 8
+    m = match( "^_dev_dvb_adapter(\d+)_.*(\d{%d})_([HV+])_satconf_(\d+)_[a-z\d]+$"%flen, basename( sfile ))
     if m:
       adapter, freq, pol, satconf = m.groups( )
       adapter = int(adapter)
       freq    = int(freq)
       satconf = int(satconf)
     else:
-      m = match( "^_dev_dvb_adapter(\d+)_.*(\d{8})_[a-z\d]+$", basename( sfile ))
+      flen = 9
+      m = match( "^_dev_dvb_adapter(\d+)_.*(\d{%d})_[a-z\d]+$"%flen, basename( sfile ))
       if m:
         adapter, freq = m.groups( )
         adapter = int(adapter)
@@ -38,21 +40,23 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       adapterconf = expanduser( base + "/dvbadapters/_dev_dvb_adapter%d_*"%( adapter ))
       g = glob( adapterconf )
       if len( g ) != 1:
-        print "Error finding adatper config: '%s'"%adapterconf
-        exit( -1 )
-      fp = open( g[0] )
-      adapterconf = json.load( fp )
-      fp.close( )
-      config[adapter]["config"]  = { }
-      config[adapter]["config"]["displayname"] = adapterconf["displayname"]
-      config[adapter][frontend]["config"] = { }
-      config[adapter][frontend]["config"]["autodiscovery"]  = adapterconf["autodiscovery"]
-      config[adapter][frontend]["config"]["nitoid"]         = adapterconf["nitoid"]
-      config[adapter][frontend]["config"]["diseqc_version"] = adapterconf["diseqc_version"]
-      config[adapter][frontend]["config"]["qmon"]           = adapterconf["qmon"]
-      config[adapter][frontend]["config"]["idlescan"]       = adapterconf["idlescan"]
-      config[adapter][frontend]["config"]["type"]           = adapterconf["type"]
-      config[adapter][frontend]["config"]["dump_muxes"]     = adapterconf["dump_muxes"]
+        print "Warning: finding adatper config: '%s'"%adapterconf
+        config[adapter]["config"]  = { }
+        config[adapter][frontend]["config"] = { }
+      else:
+        fp = open( g[0] )
+        adapterconf = json.load( fp )
+        fp.close( )
+        config[adapter]["config"]  = { }
+        config[adapter]["config"]["displayname"] = adapterconf["displayname"]
+        config[adapter][frontend]["config"] = { }
+        config[adapter][frontend]["config"]["autodiscovery"]  = adapterconf["autodiscovery"]
+        config[adapter][frontend]["config"]["nitoid"]         = adapterconf["nitoid"]
+        config[adapter][frontend]["config"]["diseqc_version"] = adapterconf["diseqc_version"]
+        config[adapter][frontend]["config"]["qmon"]           = adapterconf["qmon"]
+        config[adapter][frontend]["config"]["idlescan"]       = adapterconf["idlescan"]
+        config[adapter][frontend]["config"]["type"]           = adapterconf["type"]
+        config[adapter][frontend]["config"]["dump_muxes"]     = adapterconf["dump_muxes"]
 
     if satconf is not None:
       foundport = False
@@ -112,12 +116,18 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       config[adapter][frontend][port][mux]["config"]["status"]            = conf["status"]
       config[adapter][frontend][port][mux]["config"]["transportstreamid"] = conf["transportstreamid"]
       config[adapter][frontend][port][mux]["config"]["frequency"]         = conf["frequency"]
-      config[adapter][frontend][port][mux]["config"]["symbol_rate"]       = conf["symbol_rate"]
-      config[adapter][frontend][port][mux]["config"]["fec"]               = conf["fec"]
-      config[adapter][frontend][port][mux]["config"]["polarisation"]      = conf["polarisation"]
-      config[adapter][frontend][port][mux]["config"]["modulation"]        = conf["modulation"]
-      config[adapter][frontend][port][mux]["config"]["delivery_system"]   = conf["delivery_system"]
-      config[adapter][frontend][port][mux]["config"]["rolloff"]           = conf["rolloff"]
+      if conf.has_key( "symbol_rate" ):
+        config[adapter][frontend][port][mux]["config"]["symbol_rate"]       = conf["symbol_rate"]
+      if conf.has_key( "fec" ):
+        config[adapter][frontend][port][mux]["config"]["fec"]               = conf["fec"]
+      if conf.has_key( "polarisation" ):
+        config[adapter][frontend][port][mux]["config"]["polarisation"]      = conf["polarisation"]
+      if conf.has_key( "modulation" ):
+        config[adapter][frontend][port][mux]["config"]["modulation"]        = conf["modulation"]
+      if conf.has_key( "delivery_system" ):
+        config[adapter][frontend][port][mux]["config"]["delivery_system"]   = conf["delivery_system"]
+      if conf.has_key( "rolloff" ):
+        config[adapter][frontend][port][mux]["config"]["rolloff"]           = conf["rolloff"]
 
     service = config[adapter][frontend][port][mux]["servicecount"]
 
