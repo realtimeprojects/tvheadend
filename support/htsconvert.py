@@ -41,7 +41,7 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       adapterconf = expanduser( base + "/dvbadapters/_dev_dvb_adapter%d_*"%( adapter ))
       g = glob( adapterconf )
       if len( g ) != 1:
-        print "Warning: finding adatper config: '%s'"%adapterconf
+        print "Warning: cannot find one adapter config: '%s'"%adapterconf
         config[adapter]["config"]  = { }
         config[adapter][frontend]["config"] = { }
       else:
@@ -50,7 +50,9 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
         fp.close( )
         config[adapter]["config"]  = { }
         config[adapter]["config"]["displayname"] = adapterconf["displayname"]
-        config[adapter][frontend]["config"] = { }
+        config[adapter]["config"]["device"] = "/dev/dvb/adapter%d"%adapter
+        config[adapter]["config"]["id"] = adapter
+        config[adapter][frontend]["config"] = { "id": frontend }
         config[adapter][frontend]["config"]["autodiscovery"]  = adapterconf["autodiscovery"]
         config[adapter][frontend]["config"]["nitoid"]         = adapterconf["nitoid"]
         config[adapter][frontend]["config"]["diseqc_version"] = adapterconf["diseqc_version"]
@@ -79,7 +81,7 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
         fp = open( g[0] )
         conf = json.load( fp )
         fp.close( )
-        config[adapter][frontend][port]["config"] = {}
+        config[adapter][frontend][port]["config"] = { "id": port }
         config[adapter][frontend][port]["config"]["name"]    = conf["name"]
         config[adapter][frontend][port]["config"]["port"]    = conf["port"]
         config[adapter][frontend][port]["config"]["comment"] = conf["comment"]
@@ -112,7 +114,7 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
       fp = open( g[0] )
       conf = json.load( fp )
       fp.close( )
-      config[adapter][frontend][port][mux]["config"] = {}
+      config[adapter][frontend][port][mux]["config"] = { "id": mux }
       config[adapter][frontend][port][mux]["config"]["quality"]           = conf["quality"]
       config[adapter][frontend][port][mux]["config"]["enabled"]           = conf["enabled"]
       config[adapter][frontend][port][mux]["config"]["status"]            = conf["status"]
@@ -150,6 +152,7 @@ for transport in glob( expanduser( base + "/dvbtransports/*" )):
 
     service = config[adapter][frontend][port][mux]["servicecount"]
     config[adapter][frontend][port][mux][service] = conf
+    config[adapter][frontend][port][mux][service]["id"] = service
     config[adapter][frontend][port][mux]["servicecount"] += 1
 
 path = expanduser( base ) + "/newconf"
